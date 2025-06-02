@@ -1,0 +1,777 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registration & Login</title>
+  <style>
+    body {
+      font-family: 'Palatino Linotype', Palatino, serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      flex-direction: column;
+    }
+    .main-container {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    h2, h3 {
+      color: #1a73e8;
+      margin: 0 0 20px;
+      font-weight: normal;
+    }
+    .container {
+      display: none;
+    }
+    .container.active {
+      display: block;
+    }
+    input, select {
+      width: calc(100% - 24px);
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 16px;
+      font-family: 'Palatino Linotype', Palatino, serif;
+      box-sizing: border-box;
+    }
+    input:focus, select:focus {
+      border-color: #1a73e8;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      font-family: 'Palatino Linotype', Palatino, serif;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #1557b0;
+    }
+    .error {
+      color: #d93025;
+      font-size: 14px;
+      margin: 5px 0;
+      display: none;
+      text-align: left;
+    }
+    .info {
+      margin: 15px 0;
+      padding: 15px;
+      background: #e8f0fe;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .info p {
+      margin: 5px 0;
+      color: #174ea6;
+    }
+    img.logo {
+      max-width: 120px;
+      margin-bottom: 20px;
+    }
+    img.profile {
+      max-width: 150px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    .toggle-link {
+      color: #1a73e8;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 10px;
+      display: inline-block;
+    }
+    .toggle-link:hover {
+      text-decoration: underline;
+    }
+    footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #5f6368;
+    }
+    #dataError {
+      color: #d93025;
+      font-size: 14px;
+      margin: 10px 0;
+      display: none;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 300px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .modal-content p {
+      margin: 0 0 20px;
+      color: #202124;
+      font-size: 16px;
+    }
+    .modal-content button {
+      margin: 5px;
+      width: auto;
+      padding: 10px 20px;
+    }
+    @media (max-width: 480px) {
+      .main-container {
+        padding: 15px;
+        margin: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <img src="https://via.placeholder.com/120x40?text=Logo" alt="Logo" class="logo">
+
+    <!-- Registration Section -->
+    <div id="registerSection" class="container">
+      <h2>Register</h2>
+      <select id="regType" onchange="showForm()">
+        <option value="">-- Select --</option>
+        <option value="user">User Registration</option>
+        <option value="admin">Admin Registration</option>
+      </select>
+      <div id="dataError" class="error">Failed to load dropdown data. Please try again.</div>
+
+      <div id="userForm" class="container">
+        <h3>User Registration</h3>
+        <input type="email" id="userEmail" placeholder="Email" required>
+        <div id="userEmailError" class="error">Please enter a valid email</div>
+        <input type="text" id="userUsername" placeholder="Username" required>
+        <input type="text" id="userFirstName" placeholder="First Name" required>
+        <input type="text" id="userLastName" placeholder="Last Name" required>
+        <input type="text" id="userDrivingLicense" placeholder="Driving License">
+        <input type="text" id="userNationalId" placeholder="National ID">
+        <input type="text" id="userNumberPlate" placeholder="Number Plate">
+        <input type="text" id="userAddress" placeholder="Address">
+        <input type="text" id="userLocation" placeholder="Location">
+        <input type="password" id="userPassword" placeholder="Password" required>
+        <div id="passwordError" class="error">Password must be at least 12 characters</div>
+        <select id="userCountry" required>
+          <option value="">Select Country</option>
+        </select>
+        <input type="tel" id="userEmergencyContact" placeholder="Emergency Contact Number">
+        <input type="tel" id="userRelatedEmergencyContact" placeholder="Related Emergency Contact">
+        <input type="text" id="userLatitude" placeholder="Latitude">
+        <input type="text" id="userLongitude" placeholder="Longitude">
+        <button onclick="register('user')">Register</button>
+        <div id="userMessage"></div>
+        <span class="toggle-link" onclick="showLogin()">Already registered? Login</span>
+      </div>
+
+      <div id="adminForm" class="container">
+        <h3>Admin Registration</h3>
+        <input type="email" id="adminEmail" placeholder="Email" required>
+        <div id="adminEmailError" class="error">Please enter a valid email</div>
+        <input type="text" id="adminUsername" placeholder="Username" required>
+        <select id="adminType" required>
+          <option value="">Select Type</option>
+        </select>
+        <select id="adminCountry" required>
+          <option value="">Select Country</option>
+        </select>
+        <select id="adminThana" required>
+          <option value="">Select Thana</option>
+        </select>
+        <input type="text" id="adminEmergencyResponse" placeholder="Emergency Response">
+        <input type="text" id="adminServiceInfo" placeholder="Service Information">
+        <input type="text" id="adminLatitude" placeholder="Latitude">
+        <input type="text" id="adminLongitude" placeholder="Longitude">
+        <input type="password" id="adminPassword" placeholder="Password" required>
+        <div id="adminPasswordError" class="error">Password must be at least 12 characters</div>
+        <button onclick="register('admin')">Register</button>
+        <div id="adminMessage"></div>
+        <span class="toggle-link" onclick="showLogin()">Already registered? Login</span>
+      </div>
+    </div>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="container active">
+      <h2>Login</h2>
+      <select id="loginType" onchange="showLoginForm()">
+        <option value="">-- Select --</option>
+        <option value="user">User Login</option>
+        <option value="admin">Admin Login</option>
+      </select>
+      <div id="loginError" class="error">Please select a login type.</div>
+
+      <div id="userLoginForm" class="container">
+        <h3>User Login</h3>
+        <input type="email" id="userLoginEmail" placeholder="Email" required>
+        <div id="userLoginEmailError" class="error">Please enter a valid email</div>
+        <input type="password" id="userLoginPassword" placeholder="Password" required>
+        <div id="userLoginPasswordError" class="error">Password must be at least 12 characters</div>
+        <button onclick="login('user')">Login</button>
+        <div id="userLoginMessage"></div>
+        <span class="toggle-link" onclick="showRegister()">Not registered? Register</span>
+      </div>
+
+      <div id="adminLoginForm" class="container">
+        <h3>Admin Login</h3>
+        <input type="email" id="adminLoginEmail" placeholder="Email" required>
+        <div id="adminLoginEmailError" class="error">Please enter a valid email</div>
+        <input type="password" id="adminLoginPassword" placeholder="Password" required>
+        <div id="adminLoginPasswordError" class="error">Password must be at least 12 characters</div>
+        <select id="adminLoginType" required>
+          <option value="">Select Admin Type</option>
+        </select>
+        <button onclick="login('admin')">Login</button>
+        <div id="adminLoginMessage"></div>
+        <span class="toggle-link" onclick="showRegister()">Not registered? Register</span>
+      </div>
+    </div>
+
+    <!-- User Panel -->
+    <div id="userPanel" class="container">
+      <h2>User Panel</h2>
+      <div id="userInfo" class="info">
+        <p><strong>Email:</strong> <span id="displayUserEmail"></span></p>
+        <p><strong>Username:</strong> <span id="displayUserUsername"></span></p>
+        <p><strong>First Name:</strong> <span id="displayUserFirstName"></span></p>
+        <p><strong>Last Name:</strong> <span id="displayUserLastName"></span></p>
+        <p><strong>Driving License:</strong> <span id="displayUserDrivingLicense"></span></p>
+        <p><strong>National ID:</strong> <span id="displayUserNationalId"></span></p>
+        <p><strong>Number Plate:</strong> <span id="displayUserNumberPlate"></span></p>
+        <p><strong>Address:</strong> <span id="displayUserAddress"></span></p>
+        <p><strong>Location:</strong> <span id="displayUserLocation"></span></p>
+        <p><strong>Country:</strong> <span id="displayUserCountry"></span></p>
+        <p><strong>Emergency Contact:</strong> <span id="displayUserEmergencyContact"></span></p>
+        <p><strong>Related Emergency Contact:</strong> <span id="displayUserRelatedEmergencyContact"></span></p>
+        <p><strong>Latitude:</strong> <span id="displayUserLatitude"></span></p>
+        <p><strong>Longitude:</strong> <span id="displayUserLongitude"></span></p>
+      </div>
+      <h3>Change Password</h3>
+      <input type="password" id="userNewPassword" placeholder="New Password" required>
+      <div id="userPasswordErrorPanel" class="error">Password must be at least 12 characters</div>
+      <button onclick="changePassword('user')">Change Password</button>
+      <div id="userPasswordMessage"></div>
+      <h3>Upload Profile Image</h3>
+      <input type="file" id="userProfileImage" accept="image/*">
+      <button onclick="uploadImage('user')">Upload Image</button>
+      <div id="userImageMessage"></div>
+      <img id="displayUserImage" src="" alt="Profile Image" class="profile" style="display: none;">
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="container">
+      <h2>Admin Panel</h2>
+      <div id="adminInfo" class="info">
+        <p><strong>Email:</strong> <span id="displayAdminEmail"></span></p>
+        <p><strong>Username:</strong> <span id="displayAdminUsername"></span></p>
+        <p><strong>Admin Type:</strong> <span id="displayAdminType"></span></p>
+        <p><strong>Country:</strong> <span id="displayAdminCountry"></span></p>
+        <p><strong>Thana:</strong> <span id="displayAdminThana"></span></p>
+        <p><strong>Emergency Response:</strong> <span id="displayAdminEmergencyResponse"></span></p>
+        <p><strong>Service Info:</strong> <span id="displayAdminServiceInfo"></span></p>
+        <p><strong>Latitude:</strong> <span id="displayAdminLatitude"></span></p>
+        <p><strong>Longitude:</strong> <span id="displayAdminLongitude"></span></p>
+      </div>
+      <h3>Change Password</h3>
+      <input type="password" id="adminNewPassword" placeholder="New Password" required>
+      <div id="adminPasswordErrorPanel" class="error">Password must be at least 12 characters</div>
+      <button onclick="changePassword('admin')">Change Password</button>
+      <div id="adminPasswordMessage"></div>
+      <h3>Upload Profile Image</h3>
+      <input type="file" id="adminProfileImage" accept="image/*">
+      <button onclick="uploadImage('admin')">Upload Image</button>
+      <div id="adminImageMessage"></div>
+      <img id="displayAdminImage" src="" alt="Profile Image" class="profile" style="display: none;">
+    </div>
+    <footer>
+      © 2025 Your App Name. All rights reserved.
+    </footer>
+  </div>
+
+  <!-- Geolocation Modal -->
+  <div id="locationModal" class="modal">
+    <div class="modal-content">
+      <p>Allow us to access your location to auto-fill latitude and longitude?</p>
+      <button onclick="getLocation()">Allow</button>
+      <button onclick="closeModal()">Deny</button>
+    </div>
+  </div>
+
+  <script>
+    const backendUrl = 'https://your-backend-url.onrender.com'; // Update with Render URL after deployment
+    let currentRegType = null;
+
+    // Load data from JSON files
+    async function loadData() {
+      console.log('Loading dropdown data...');
+      const dataError = document.getElementById('dataError');
+      dataError.style.display = 'none';
+
+      async function fetchWithRetry(url, retries = 3, delay = 1000) {
+        for (let i = 0; i < retries; i++) {
+          try {
+            console.log(`Fetching ${url}, attempt ${i + 1}`);
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+          } catch (err) {
+            console.error(`Error fetching ${url}:`, err);
+            if (i === retries - 1) throw err;
+            await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+          }
+        }
+      }
+
+      try {
+        // Fetch countries
+        const countries = await fetchWithRetry('/public/countries.json');
+        console.log('Countries loaded:', countries);
+        const userCountry = document.getElementById('userCountry');
+        const adminCountry = document.getElementById('adminCountry');
+        countries.forEach(country => {
+          const option = document.createElement('option');
+          option.value = country;
+          option.text = country;
+          userCountry.appendChild(option.cloneNode(true));
+          adminCountry.appendChild(option);
+        });
+
+        // Fetch admin options
+        const adminOptions = await fetchWithRetry('/public/adminOptions.json');
+        console.log('Admin options loaded:', adminOptions);
+        const adminType = document.getElementById('adminType');
+        const adminLoginType = document.getElementById('adminLoginType');
+        adminOptions.types.forEach(type => {
+          const option = document.createElement('option');
+          option.value = type;
+          option.text = type;
+          adminType.appendChild(option.cloneNode(true));
+          adminLoginType.appendChild(option);
+        });
+
+        const adminThana = document.getElementById('adminThana');
+        adminOptions.thanas.forEach(thana => {
+          const option = document.createElement('option');
+          option.value = thana;
+          option.text = thana;
+          adminThana.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Error loading data:', err);
+        dataError.style.display = 'block';
+      }
+    }
+
+    // Toggle between login and register
+    function showLogin() {
+      console.log('Showing login section');
+      document.getElementById('registerSection').classList.remove('active');
+      document.getElementById('loginSection').classList.add('active');
+      document.getElementById('userForm').classList.remove('active');
+      document.getElementById('adminForm').classList.remove('active');
+      document.getElementById('userLoginForm').classList.remove('active');
+      document.getElementById('adminLoginForm').classList.remove('active');
+      document.getElementById('userPanel').classList.remove('active');
+      document.getElementById('adminPanel').classList.remove('active');
+    }
+
+    function showRegister() {
+      console.log('Showing register section');
+      document.getElementById('loginSection').classList.remove('active');
+      document.getElementById('registerSection').classList.add('active');
+      document.getElementById('userLoginForm').classList.remove('active');
+      document.getElementById('adminLoginForm').classList.remove('active');
+      document.getElementById('userPanel').classList.remove('active');
+      document.getElementById('adminPanel').classList.remove('active');
+    }
+
+    // Show selected registration form
+    function showForm() {
+      console.log('Showing registration form');
+      const regType = document.getElementById('regType').value;
+      currentRegType = regType;
+      document.getElementById('userForm').classList.remove('active');
+      document.getElementById('adminForm').classList.remove('active');
+      if (regType === 'user' || regType === 'admin') {
+        document.getElementById('locationModal').style.display = 'flex';
+        document.getElementById(regType + 'Form').classList.add('active');
+      }
+    }
+
+    // Geolocation handling
+    function getLocation() {
+      console.log('Requesting geolocation');
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            const { latitude, longitude } = position.coords;
+            console.log(`Geolocation success: ${latitude}, ${longitude}`);
+            if (currentRegType === 'user') {
+              document.getElementById('userLatitude').value = latitude.toFixed(6);
+              document.getElementById('userLongitude').value = longitude.toFixed(6);
+            } else if (currentRegType === 'admin') {
+              document.getElementById('adminLatitude').value = latitude.toFixed(6);
+              document.getElementById('adminLongitude').value = longitude.toFixed(6);
+            }
+            closeModal();
+          },
+          error => {
+            console.error('Geolocation error:', error);
+            alert('Unable to retrieve location. Please enter latitude and longitude manually.');
+            closeModal();
+          }
+        );
+      } else {
+        console.error('Geolocation not supported');
+        alert('Geolocation is not supported by this browser.');
+        closeModal();
+      }
+    }
+
+    function closeModal() {
+      console.log('Closing modal');
+      document.getElementById('locationModal').style.display = 'none';
+    }
+
+    // Show selected login form
+    function showLoginForm() {
+      console.log('Showing login form');
+      const loginType = document.getElementById('loginType').value;
+      document.getElementById('loginError').style.display = 'none';
+      document.getElementById('userLoginForm').classList.remove('active');
+      document.getElementById('adminLoginForm').classList.remove('active');
+      if (loginType === 'user') {
+        document.getElementById('userLoginForm').classList.add('active');
+      } else if (loginType === 'admin') {
+        document.getElementById('adminLoginForm').classList.add('active');
+      } else {
+        document.getElementById('loginError').style.display = 'block';
+      }
+    }
+
+    // Validate and register
+    async function register(type) {
+      console.log(`Registering ${type}`);
+      const message = document.getElementById(type + 'Message');
+      const email = document.getElementById(type + 'Email').value;
+      const password = document.getElementById(type + 'Password').value;
+      const emailError = document.getElementById(type + 'EmailError');
+      const passwordError = document.getElementById(type + 'PasswordError');
+
+      emailError.style.display = 'none';
+      passwordError.style.display = 'none';
+      message.innerHTML = '';
+
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        emailError.style.display = 'block';
+        return;
+      }
+      if (password.length < 12) {
+        passwordError.style.display = 'block';
+        return;
+      }
+
+      const data = {};
+      const fields = type === 'user' ? 
+        ['email', 'username', 'first_name', 'last_name', 'driving_license', 'national_id', 
+         'number_plate', 'address', 'location', 'latitude', 'longitude', 'password', 'country', 
+         'emergency_contact_number', 'emergency_contact_number_of_a_related_person'] :
+        ['email', 'username', 'admin_type', 'country', 'thana', 'emergency_response', 
+         'service_info', 'latitude', 'longitude', 'password'];
+      fields.forEach(field => {
+        const value = document.getElementById(type + field.charAt(0).toUpperCase() + field.slice(1)).value;
+        if (value) data[field] = value;
+      });
+
+      try {
+        const res = await fetch(`${backendUrl}/register-${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.text();
+        message.style.color = res.ok ? '#188038' : '#d93025';
+        message.innerHTML = result;
+      } catch (err) {
+        console.error(`Error registering ${type}:`, err);
+        message.style.color = '#d93025';
+        message.innerHTML = 'Error connecting to server';
+      }
+    }
+
+    // Validate and login
+    async function login(type) {
+      console.log(`Logging in ${type}`);
+      const message = document.getElementById(type + 'LoginMessage');
+      const email = document.getElementById(type + 'LoginEmail').value;
+      const password = document.getElementById(type + 'LoginPassword').value;
+      const emailError = document.getElementById(type + 'LoginEmailError');
+      const passwordError = document.getElementById(type + 'LoginPasswordError');
+
+      emailError.style.display = 'none';
+      passwordError.style.display = 'none';
+      message.innerHTML = '';
+
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        emailError.style.display = 'block';
+        return;
+      }
+      if (password.length < 12) {
+        passwordError.style.display = 'block';
+        return;
+      }
+
+      const data = { email, password };
+      if (type === 'admin') {
+        data.admin_type = document.getElementById('adminLoginType').value;
+        if (!data.admin_type) {
+          message.style.color = '#d93025';
+          message.innerHTML = 'Please select an admin type';
+          return;
+        }
+      }
+
+      try {
+        const res = await fetch(`${backendUrl}/login-${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.text();
+        message.style.color = res.ok ? '#188038' : '#d93025';
+        message.innerHTML = result;
+        if (res.ok) {
+          localStorage.setItem(type + 'Email', email);
+          if (type === 'admin') localStorage.setItem('adminType', data.admin_type);
+          setTimeout(() => {
+            document.getElementById('registerSection').classList.remove('active');
+            document.getElementById('loginSection').classList.remove('active');
+            document.getElementById('userLoginForm').classList.remove('active');
+            document.getElementById('adminLoginForm').classList.remove('active');
+            document.getElementById(type + 'Panel').classList.add('active');
+            if (type === 'user') loadUserData();
+            else loadAdminData();
+          }, 1000);
+        }
+      } catch (err) {
+        console.error(`Error logging in ${type}:`, err);
+        message.style.color = '#d93025';
+        message.innerHTML = 'Error connecting to server';
+      }
+    }
+
+    // Load user data
+    async function loadUserData() {
+      console.log('Loading user data');
+      try {
+        const res = await fetch(`${backendUrl}/user-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: localStorage.getItem('userEmail') })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('displayUserEmail').textContent = data.email || 'N/A';
+          document.getElementById('displayUserUsername').textContent = data.username || 'N/A';
+          document.getElementById('displayUserFirstName').textContent = data.first_name || 'N/A';
+          document.getElementById('displayUserLastName').textContent = data.last_name || 'N/A';
+          document.getElementById('displayUserDrivingLicense').textContent = data.driving_license || 'N/A';
+          document.getElementById('displayUserNationalId').textContent = data.national_id || 'N/A';
+          document.getElementById('displayUserNumberPlate').textContent = data.number_plate || 'N/A';
+          document.getElementById('displayUserAddress').textContent = data.address || 'N/A';
+          document.getElementById('displayUserLocation').textContent = data.location || 'N/A';
+          document.getElementById('displayUserCountry').textContent = data.country || 'N/A';
+          document.getElementById('displayUserEmergencyContact').textContent = data.emergency_contact_number || 'N/A';
+          document.getElementById('displayUserRelatedEmergencyContact').textContent = data.emergency_contact_number_of_a_related_person || 'N/A';
+          document.getElementById('displayUserLatitude').textContent = data.latitude || 'N/A';
+          document.getElementById('displayUserLongitude').textContent = data.longitude || 'N/A';
+          if (data.image) {
+            document.getElementById('displayUserImage').src = data.image;
+            document.getElementById('displayUserImage').style.display = 'block';
+          }
+        } else {
+          document.getElementById('userInfo').innerHTML = '<p style="color: #d93025;">Error loading user data</p>';
+        }
+      } catch (err) {
+        console.error('Error loading user data:', err);
+        document.getElementById('userInfo').innerHTML = '<p style="color: #d93025;">Error connecting to server</p>';
+      }
+    }
+
+    // Load admin data
+    async function loadAdminData() {
+      console.log('Loading admin data');
+      try {
+        const res = await fetch(`${backendUrl}/admin-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: localStorage.getItem('adminEmail'), admin_type: localStorage.getItem('adminType') })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('displayAdminEmail').textContent = data.email || 'N/A';
+          document.getElementById('displayAdminUsername').textContent = data.username || 'N/A';
+          document.getElementById('displayAdminType').textContent = data.admin_type || 'N/A';
+          document.getElementById('displayAdminCountry').textContent = data.country || 'N/A';
+          document.getElementById('displayAdminThana').textContent = data.thana || 'N/A';
+          document.getElementById('displayAdminEmergencyResponse').textContent = data.emergency_response || 'N/A';
+          document.getElementById('displayAdminServiceInfo').textContent = data.service_info || 'N/A';
+          document.getElementById('displayAdminLatitude').textContent = data.latitude || 'N/A';
+          document.getElementById('displayAdminLongitude').textContent = data.longitude || 'N/A';
+          if (data.image) {
+            document.getElementById('displayAdminImage').src = data.image;
+            document.getElementById('displayAdminImage').style.display = 'block';
+          }
+        } else {
+          document.getElementById('adminInfo').innerHTML = '<p style="color: #d93025;">Error loading admin data</p>';
+        }
+      } catch (err) {
+        console.error('Error loading admin data:', err);
+        document.getElementById('adminInfo').innerHTML = '<p style="color: #d93025;">Error connecting to server</p>';
+      }
+    }
+
+    // Change password
+    async function changePassword(type) {
+      console.log(`Changing password for ${type}`);
+      const newPassword = document.getElementById(type + 'NewPassword').value;
+      const passwordError = document.getElementById(type + 'PasswordErrorPanel');
+      const message = document.getElementById(type + 'PasswordMessage');
+
+      passwordError.style.display = 'none';
+      message.innerHTML = '';
+
+      if (newPassword.length < 12) {
+        passwordError.style.display = 'block';
+        return;
+      }
+
+      try {
+        const data = { email: localStorage.getItem(type + 'Email'), newPassword };
+        if (type === 'admin') data.admin_type = localStorage.getItem('adminType');
+        const res = await fetch(`${backendUrl}/change-password-${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const result = await res.text();
+        message.style.color = res.ok ? '#188038' : '#d93025';
+        message.innerHTML = result;
+      } catch (err) {
+        console.error(`Error changing password for ${type}:`, err);
+        message.style.color = '#d93025';
+        message.innerHTML = 'Error connecting to server';
+      }
+    }
+
+    // Upload image
+    async function uploadImage(type) {
+      console.log(`Uploading image for ${type}`);
+      const file = document.getElementById(type + 'ProfileImage').files[0];
+      const message = document.getElementById(type + 'ImageMessage');
+      message.innerHTML = '';
+
+      if (!file) {
+        message.style.color = '#d93025';
+        message.innerHTML = 'Please select an image';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('email', localStorage.getItem(type + 'Email'));
+      if (type === 'admin') formData.append('admin_type', localStorage.getItem('adminType'));
+      formData.append('image', file);
+
+      try {
+        const res = await fetch(`${backendUrl}/upload-image-${type}`, {
+          method: 'POST',
+          body: formData
+        });
+        const result = await res.text();
+        message.style.color = res.ok ? '#188038' : '#d93025';
+        message.innerHTML = result;
+        if (res.ok) {
+          document.getElementById('display' + type.charAt(0).toUpperCase() + type.slice(1) + 'Image').src = URL.createObjectURL(file);
+          document.getElementById('display' + type.charAt(0).toUpperCase() + type.slice(1) + 'Image').style.display = 'block';
+        }
+      } catch (err) {
+        console.error(`Error uploading image for ${type}:`, err);
+        message.style.color = '#d93025';
+        message.innerHTML = 'Error uploading image';
+      }
+    }
+
+    // Initialize
+    console.log('Initializing app');
+    loadData();
+  </script>
+</body>
+</html>
